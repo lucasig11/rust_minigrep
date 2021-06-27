@@ -1,5 +1,14 @@
 use std::{error::Error, fs};
 
+const HELP: &str = r#"
+USAGE
+    minigrep <pattern> <file> [flags]
+
+FLAGS:
+    -i - Case insensitive search;
+    -q - Quiet mode. Only outputs occurence count;
+"#;
+
 pub struct Program;
 
 impl Program {
@@ -12,8 +21,10 @@ impl Program {
             file.case_insensitive_search(config.query)
         };
 
-        for line in &searcher {
-            println!("{}", line);
+        if !config.quiet {
+            for line in &searcher {
+                println!("{}", line);
+            }
         }
 
         println!("{} occurences found.", searcher.len());
@@ -27,19 +38,34 @@ struct Config<'a> {
     query: &'a str,
     filename: &'a str,
     case_sensitive: bool,
+    quiet: bool,
 }
 
 impl<'a> Config<'a> {
     fn new(args: &'a [String]) -> Result<Self, &str> {
-        let case_sensitive = std::env::var("CASE_INSENSITIVE").is_err();
+        if args.len() < 3 {
+            return Err(&HELP);
+        }
 
-        match args.get(1..) {
-            Some([query, filename, ..]) => Ok(Self {
-                query,
-                filename,
-                case_sensitive,
-            }),
-            _ => Err("Missing arguments. Usage: minigrep <pattern> <file>"),
+        let mut case_sensitive = std::env::var("CASE_INSENSITIVE").is_err();
+
+        match args.split_at(3) {
+            ([_p, query, filename], other_args) => {
+                case_sensitive = if other_args.contains(&String::from("-i")) {
+                    false
+                } else {
+                    case_sensitive
+                };
+                let quiet = other_args.contains(&"-q".to_string());
+
+                Ok(Self {
+                    query,
+                    filename,
+                    case_sensitive,
+                    quiet,
+                })
+            }
+            _ => Err(&HELP),
         }
     }
 }
