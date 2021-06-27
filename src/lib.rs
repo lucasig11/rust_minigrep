@@ -12,9 +12,12 @@ impl Program {
             file.case_insensitive_search(config.query)
         };
 
-        for line in searcher {
+        for line in &searcher {
             println!("{}", line);
         }
+
+        println!("{} occurences found.", searcher.len());
+
         Ok(())
     }
 }
