@@ -1,4 +1,4 @@
-use std::{error::Error, fs};
+use std::{env, error::Error, fs};
 
 const HELP: &str = r#"
 USAGE
@@ -12,13 +12,14 @@ FLAGS:
 pub struct Program;
 
 impl Program {
-    pub fn run(args: &[String]) -> Result<(), Box<dyn Error>> {
-        let config = Config::new(&args)?;
-        let file = FileReader::init(&config.filename)?;
+    pub fn run(args: env::Args) -> Result<(), Box<dyn Error>> {
+        let config = Config::new(args)?;
+        let content = fs::read_to_string(&config.filename)?;
+        let file = FileReader::init(&content)?;
         let searcher = if config.case_sensitive {
-            file.search(config.query)
+            file.search(&config.query)
         } else {
-            file.case_insensitive_search(config.query)
+            file.case_insensitive_search(&config.query)
         };
 
         if !config.quiet {
@@ -34,72 +35,69 @@ impl Program {
 }
 
 #[derive(Debug)]
-struct Config<'a> {
-    query: &'a str,
-    filename: &'a str,
+struct Config {
+    query: String,
+    filename: String,
     case_sensitive: bool,
     quiet: bool,
 }
 
-impl<'a> Config<'a> {
-    fn new(args: &'a [String]) -> Result<Self, &str> {
-        if args.len() < 3 {
-            return Err(&HELP);
-        }
+impl Config {
+    fn new(mut args: env::Args) -> Result<Self, &'static str> {
+        args.next();
 
-        let mut case_sensitive = std::env::var("CASE_INSENSITIVE").is_err();
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err(&HELP),
+        };
 
-        match args.split_at(3) {
-            ([_p, query, filename], other_args) => {
-                case_sensitive = if other_args.contains(&String::from("-i")) {
-                    false
-                } else {
-                    case_sensitive
-                };
-                let quiet = other_args.contains(&"-q".to_string());
+        let filename = match args.next() {
+            Some(arg) => arg,
+            None => return Err(&HELP),
+        };
 
-                Ok(Self {
-                    query,
-                    filename,
-                    case_sensitive,
-                    quiet,
-                })
-            }
-            _ => Err(&HELP),
-        }
+        let other_args: Vec<_> = args.collect();
+
+        let case_sensitive =
+            std::env::var("CASE_INSENSITIVE").is_err() && !other_args.contains(&String::from("-i"));
+
+        let quiet = other_args.contains(&"-q".to_string());
+
+        Ok(Self {
+            query,
+            filename,
+            case_sensitive,
+            quiet,
+        })
     }
 }
 
-struct FileReader {
-    contents: String,
+#[derive(Clone, Copy)]
+struct FileReader<'a> {
+    contents: &'a str,
 }
 
-impl FileReader {
-    fn init(filename: &str) -> Result<Self, Box<dyn Error>> {
-        let contents = fs::read_to_string(&filename)?;
-        Ok(Self {
-            contents: contents.trim().to_string(),
-        })
+impl<'a> FileReader<'a> {
+    fn init(contents: &'a str) -> Result<Self, Box<dyn Error>> {
+        Ok(Self { contents })
+    }
+
+    fn lines(&self) -> std::str::Lines {
+        self.contents.lines()
     }
 
     fn search(&self, pat: &str) -> Vec<&str> {
-        let mut result: Vec<&str> = Vec::new();
-        for line in self.contents.lines() {
-            if line.contains(pat) {
-                result.push(line.trim());
-            }
-        }
-        result
+        self.lines()
+            .filter(|&line| line.contains(&pat))
+            .map(|line| line.trim())
+            .collect::<Vec<&str>>()
     }
 
     fn case_insensitive_search(&self, pat: &str) -> Vec<&str> {
-        let mut result: Vec<&str> = Vec::new();
-        for line in self.contents.lines() {
-            if line.to_lowercase().contains(&pat.to_lowercase()) {
-                result.push(line.trim());
-            }
-        }
-        result
+        self.lines()
+            .filter(|&line| line.to_lowercase().contains(&pat.to_lowercase()))
+            .map(|line| line.trim())
+            .collect::<Vec<&str>>()
     }
 }
 
@@ -118,12 +116,7 @@ mod tests {
 
         assert_eq!(
             vec!["/home/user/.cargo/bin/cargo", "/home/user/.cargo/bin/rustc"],
-            FileReader::search(
-                &FileReader {
-                    contents: contents.to_string()
-                },
-                query
-            )
+            FileReader::search(&FileReader { contents }, query)
         )
     }
 
@@ -138,12 +131,7 @@ mod tests {
 
         assert_eq!(
             vec!["/home/user/.cargo/bin/cargo", "/home/user/.cargo/bin/rustc"],
-            FileReader::case_insensitive_search(
-                &FileReader {
-                    contents: contents.to_string()
-                },
-                query
-            )
+            FileReader::case_insensitive_search(&FileReader { contents }, query)
         )
     }
 }
