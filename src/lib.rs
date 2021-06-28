@@ -82,19 +82,17 @@ impl<'a> FileReader<'a> {
         Ok(Self { contents })
     }
 
-    fn lines(&self) -> std::str::Lines {
-        self.contents.lines()
-    }
-
     fn search(&self, pat: &str) -> Vec<&str> {
-        self.lines()
+        self.contents
+            .lines()
             .filter(|&line| line.contains(&pat))
             .map(|line| line.trim())
             .collect::<Vec<&str>>()
     }
 
     fn case_insensitive_search(&self, pat: &str) -> Vec<&str> {
-        self.lines()
+        self.contents
+            .lines()
             .filter(|&line| line.to_lowercase().contains(&pat.to_lowercase()))
             .map(|line| line.trim())
             .collect::<Vec<&str>>()
