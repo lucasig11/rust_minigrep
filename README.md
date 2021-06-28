@@ -1,13 +1,11 @@
-<a href="https://doc.rust-lang.org/book/ch12-00-an-io-project.html" align="center">
-
-##### The Rust Programming Language Book
-
-</a>
-
----
 <h1 align="center">MiniGrep</h1>
+<span align="center">
+  
+  [The Rust Programming Language Book](https://doc.rust-lang.org/book/ch12-00-an-io-project.html)
 
-Command line tool that finds occurences of a pattern in a text file. 
+</span>
+
+* Command line tool that finds occurences of a pattern in a text file. 
 
 ### Running
 ```sh
